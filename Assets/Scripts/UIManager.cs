@@ -26,10 +26,10 @@ public class UIManager : MonoBehaviour
 
 
     // training program data
-    private float currentSets = 1;
-    private float currentRounds = 1;
-    private float currentActivePeriod = 1;
-    private float currentRestPeriod = 1;
+    private float currentSets = 5;
+    private float currentRounds = 5;
+    private float currentActivePeriod = 30;
+    private float currentRestPeriod = 20;
     private bool hasNewProgramBeenSaved = false;
 
 
@@ -38,6 +38,7 @@ public class UIManager : MonoBehaviour
     void Start()
     {
         GoTo_OpeningScreen();
+        CalculateTotalTime();
         // handle misc hides
 
     }
@@ -153,22 +154,29 @@ public class UIManager : MonoBehaviour
 
     public void Set_Active(float active)
     {
-        currentActivePeriod = active;
-        ActiveText.text = active + " On / " + currentRestPeriod + " Off";
+        int activeRate = (int)active * 10;
+        currentActivePeriod = activeRate;
+        ActiveText.text = activeRate + " On / " + currentRestPeriod + " Off";
         CalculateTotalTime();
     }
 
     public void Set_Rest(float rest)
     {
-        currentRestPeriod = rest;
-        ActiveText.text = currentActivePeriod + " On / " + rest + " Off";
+        int restRate = (int)rest * 10;
+        currentRestPeriod = restRate;
+        ActiveText.text = currentActivePeriod + " On / " + restRate + " Off";
         CalculateTotalTime();
     }
 
 
     private void CalculateTotalTime()
     {
-        TotalText.text = ((currentSets * currentRounds) * (currentActivePeriod + currentRestPeriod)).ToString() + " Minutes";
+        float setTime = currentActivePeriod + currentRestPeriod;
+        float totalSeconds = (currentSets * currentRounds) * (setTime);
+
+        int minutes = Mathf.FloorToInt(totalSeconds / 60F);
+        int seconds = Mathf.FloorToInt(totalSeconds - minutes * 60);
+        TotalText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
     }
     #endregion
 }
