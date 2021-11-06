@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -11,18 +12,42 @@ public class UIManager : MonoBehaviour
     public GameObject RepeatScreen;
     public GameObject SurpriseScreen;
     public GameObject TrainingScreen;
+    public GameObject FinishedScreen;
 
     //[Header("Minor Panels")]
 
 
-    [Header("Text Fields")]
+    [Header("New Program Text Fields")]
     public Text SaveText;
     public Text TrainingText;
     public Text RoundsText;
     public Text SetsText;
     public Text ActiveText;
-
     public Text TotalText;
+
+    [Header("Active Training ")]
+    public Slider TrainingSlider;
+    public Text Training_SetText;
+    public Text Training_RoundText;
+    public Text Training_IntervalText;
+    public Text Training_TimeLeftText;
+    public Text Training_TimeText;
+    public Text Training_TitleText;
+
+
+    [Header("Finished Training ")]
+    public Text Finished_SetText;
+    public Text Finished_RoundText;
+    public Text Finished_IntervalText;
+    public Text Finished_TimeLeftText;
+
+
+    [Header("Colors")]
+    public Image TimerImage;
+    public Color RestColor;
+    public Color ActiveColor;
+    public Color PrepColor;
+    public Color DefaultColor;
 
 
     // training program data
@@ -32,7 +57,18 @@ public class UIManager : MonoBehaviour
     private float currentRestPeriod = 20;
     private bool hasNewProgramBeenSaved = false;
 
+    private int trainingTotalSeconds;
+    private int trainingActiveSeconds;
+    private int trainingMinutes;
+    private int trainingSeconds;
 
+    private int trainingPrepTime = 5;
+
+    private void Awake()
+    {
+        //TODO: retrieve last saved work out
+
+    }
 
     // Start is called before the first frame update
     void Start()
@@ -58,6 +94,7 @@ public class UIManager : MonoBehaviour
         RepeatScreen.SetActive(false);
         SurpriseScreen.SetActive(false);
         TrainingScreen.SetActive(false);
+        FinishedScreen.SetActive(false);
     }
 
     public void GoTo_OpeningScreen()
@@ -92,8 +129,14 @@ public class UIManager : MonoBehaviour
     {
         HideAllScreens();
         TrainingScreen.SetActive(true);
-        // and launch the timer
     }
+
+    public void GoTo_FinishedScreen()
+    {
+        HideAllScreens();
+        FinishedScreen.SetActive(true);
+    }
+
 
     public void Cancel_Training()
     {
@@ -112,11 +155,58 @@ public class UIManager : MonoBehaviour
 
     #region Main Methods
 
+    IEnumerator CountdownToStart()
+    {
+
+        TimerImage.color = PrepColor;
+
+        while (trainingPrepTime > -1)
+        {
+            Training_TimeText.text = trainingPrepTime.ToString();
+            trainingPrepTime--;
+
+            yield return new WaitForSeconds(1);
+        }
+        TimerImage.color = ActiveColor;
+        Training_TitleText.text = "Work!";
+        StartCoroutine(Workout());
+    }
+
+    public IEnumerator Workout()
+    {
+        trainingActiveSeconds = trainingTotalSeconds;
+        SetFinishedScreenText();
+        while (trainingActiveSeconds != 0)
+        {
+            trainingActiveSeconds--;
+            ProcessWorkoutTime(trainingActiveSeconds);
+            TrainingSlider.value = Mathf.InverseLerp(0, trainingTotalSeconds, trainingActiveSeconds);
+
+            // first comes the active period
+
+            // then the rest
+
+            yield return new WaitForSeconds(1);
+        }
+
+        GoTo_FinishedScreen();
+
+    }
+
+    private void SetFinishedScreenText()
+    {
+        Finished_SetText.text = currentSets.ToString() + " Sets";
+        Finished_RoundText.text = currentRounds.ToString() + " Rounds Completed";
+        Finished_TimeLeftText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds) + " Total Time";
+
+    }
+
     public void Save_Training_Program()
     {
         if (!hasNewProgramBeenSaved)
         {
             print("Saving Program Data...");
+            //TODO: actually save to disc for retrieval later when we select repeat last
             SaveText.text = "Start?";
             hasNewProgramBeenSaved = true;
         }
@@ -130,6 +220,8 @@ public class UIManager : MonoBehaviour
     {
         print("Launching Training Program...");
         GoTo_TrainingScreen();
+        HandleTrainingTextUpdates();
+        StartCoroutine(CountdownToStart());
 
     }
 
@@ -172,11 +264,26 @@ public class UIManager : MonoBehaviour
     private void CalculateTotalTime()
     {
         float setTime = currentActivePeriod + currentRestPeriod;
-        float totalSeconds = (currentSets * currentRounds) * (setTime);
+        trainingTotalSeconds = (int)((currentSets * currentRounds) * (setTime));
 
-        int minutes = Mathf.FloorToInt(totalSeconds / 60F);
-        int seconds = Mathf.FloorToInt(totalSeconds - minutes * 60);
-        TotalText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
+        trainingMinutes = Mathf.FloorToInt(trainingTotalSeconds / 60F);
+        trainingSeconds = Mathf.FloorToInt(trainingTotalSeconds - trainingMinutes * 60);
+        TotalText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
+    }
+
+    private void ProcessWorkoutTime(int seconds)
+    {
+        trainingMinutes = Mathf.FloorToInt(seconds / 60F);
+        trainingSeconds = Mathf.FloorToInt(seconds - trainingMinutes * 60);
+        Training_TimeLeftText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
+    }
+
+    private void HandleTrainingTextUpdates()
+    {
+        Training_SetText.text = currentSets.ToString() + " Sets to Go";
+        Training_RoundText.text = currentRounds.ToString() + " Rounds Left";
+        Training_IntervalText.text = currentActivePeriod.ToString() + " / " + currentRestPeriod.ToString();
+        Training_TimeLeftText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
     }
     #endregion
 }
