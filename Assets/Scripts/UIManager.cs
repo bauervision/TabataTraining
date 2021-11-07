@@ -346,15 +346,14 @@ public class UIManager : MonoBehaviour
 
     private void CalculateTotalTime()
     {
-        float setTime = currentActivePeriod + currentRestPeriod;
-        // add in the long rest for each round
-        setTime = setTime + (currentRestRoundPeriod * currentRounds);
-        // take off 1 rest period for each round as it is now a long rest...
-        setTime = setTime - (currentRestPeriod * currentRounds);
+        float singleSetTime = currentActivePeriod + currentRestPeriod;
+        // remove 1 rest period for the long rest that replaces it after 1 full round
+        float singleRoundTime = (singleSetTime * currentSets) - currentRestPeriod;
+        // add in the one long rest
+        singleRoundTime += currentRestRoundPeriod;
+
         // figure out the raw total length based on sets and rounds
-        trainingTotalSeconds = (int)((currentSets * currentRounds) * setTime);
-        // now add in the long rest
-        trainingTotalSeconds = (int)(trainingTotalSeconds + (currentRestRoundPeriod * currentRounds) - (currentRestPeriod * currentRounds));
+        trainingTotalSeconds = (int)(currentRounds * singleRoundTime);
         // finally take off the final long rest round at the end
         trainingTotalSeconds = (int)(trainingTotalSeconds - currentRestRoundPeriod);
         // handle the processing
