@@ -2178,7 +2178,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4850026694884430081, guid: 2f320643b28e6e14fa99512fc1ba7b10, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8186480927547792983, guid: 2f320643b28e6e14fa99512fc1ba7b10, type: 3}
       propertyPath: m_Pivot.x
@@ -4006,7 +4006,6 @@ MonoBehaviour:
   Training_TitleText: {fileID: 1344837762}
   Finished_SetText: {fileID: 1416275109}
   Finished_RoundText: {fileID: 1997132281}
-  Finished_IntervalText: {fileID: 0}
   Finished_TimeLeftText: {fileID: 1448258038}
   TimerImage: {fileID: 423598309}
   RestColor: {r: 0.6037736, g: 0.13898183, b: 0.24007414, a: 1}

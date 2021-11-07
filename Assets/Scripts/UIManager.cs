@@ -38,7 +38,6 @@ public class UIManager : MonoBehaviour
     [Header("Finished Training ")]
     public Text Finished_SetText;
     public Text Finished_RoundText;
-    public Text Finished_IntervalText;
     public Text Finished_TimeLeftText;
 
 
@@ -63,6 +62,9 @@ public class UIManager : MonoBehaviour
     private int trainingSeconds;
 
     private int trainingPrepTime = 5;
+
+    int activeRounds;
+    int activeSets;
 
     private void Awake()
     {
@@ -140,15 +142,14 @@ public class UIManager : MonoBehaviour
 
     public void Cancel_Training()
     {
-        print("Canceling Current Training");
         HideAllScreens();
         OpeningScreen.SetActive(true);
-        // and launch the timer
+        StopAllCoroutines();
     }
 
     public void Start_Training()
     {
-        print("Start Current Training!");
+
         // and launch the timer
     }
     #endregion
@@ -157,7 +158,7 @@ public class UIManager : MonoBehaviour
 
     IEnumerator CountdownToStart()
     {
-
+        Training_TitleText.text = "Ready?";
         TimerImage.color = PrepColor;
 
         while (trainingPrepTime > -1)
@@ -167,31 +168,74 @@ public class UIManager : MonoBehaviour
 
             yield return new WaitForSeconds(1);
         }
-        TimerImage.color = ActiveColor;
-        Training_TitleText.text = "Work!";
-        StartCoroutine(Workout());
+
+        StartCoroutine(HandleWorkoutSlider());
+        StartCoroutine(ActiveSet());
     }
 
-    public IEnumerator Workout()
+
+    public IEnumerator HandleWorkoutSlider()
     {
         trainingActiveSeconds = trainingTotalSeconds;
+        // store current workout program data for the finished screen
         SetFinishedScreenText();
+
         while (trainingActiveSeconds != 0)
         {
             trainingActiveSeconds--;
             ProcessWorkoutTime(trainingActiveSeconds);
             TrainingSlider.value = Mathf.InverseLerp(0, trainingTotalSeconds, trainingActiveSeconds);
+            yield return new WaitForSeconds(1);
+        }
+        GoTo_FinishedScreen();
+        StopAllCoroutines();
+    }
 
-            // first comes the active period
+    public IEnumerator ActiveSet()
+    {
+        int activePeriod = (int)currentActivePeriod;
+        int restPeriod = (int)currentRestPeriod;
+        TimerImage.color = ActiveColor;
+        Training_TitleText.text = "Work!";
+        while (activePeriod != 0)
+        {
+            activePeriod--;
 
-            // then the rest
-
+            Training_TimeText.text = activePeriod.ToString();
             yield return new WaitForSeconds(1);
         }
 
-        GoTo_FinishedScreen();
+        TimerImage.color = RestColor;
+        Training_TitleText.text = "Rest!";
+        while (restPeriod != 0)
+        {
+            restPeriod--;
+            Training_TimeText.text = restPeriod.ToString();
+            yield return new WaitForSeconds(1);
+        }
+        //we've finished a set
+        activeSets--;
+        Training_SetText.text = activeSets.ToString() + " Sets to Go!";
 
+        // check to see if we have more sets to do
+        if (activeSets != 0)
+        {
+            StartCoroutine(ActiveSet());
+        }
+        else//active sets equals zero which means we've finished a round
+        {
+            activeRounds--;
+            Training_RoundText.text = activeRounds.ToString() + " Rounds Left!";
+            if (activeRounds != 0)
+            {
+                // reset the set counter
+                activeSets = (int)currentSets;
+                //do it all again
+                StartCoroutine(ActiveSet());
+            }
+        }
     }
+
 
     private void SetFinishedScreenText()
     {
