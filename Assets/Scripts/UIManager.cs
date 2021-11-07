@@ -68,7 +68,7 @@ public class UIManager : MonoBehaviour
     private int trainingMinutes;
     private int trainingSeconds;
 
-    private int trainingPrepTime = 5;
+    private int trainingPrepTime = 10;
 
     int activeRounds;
     int activeSets;
@@ -82,8 +82,15 @@ public class UIManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
+
         GoTo_OpeningScreen();
         CalculateTotalTime();
+
+        // for now hide these
+        RepeatScreen.SetActive(false);
+        SurpriseScreen.SetActive(false);
+
         // handle misc hides
         RestRoundPanel.SetActive(false);
     }
@@ -165,10 +172,16 @@ public class UIManager : MonoBehaviour
 
     IEnumerator CountdownToStart()
     {
-        Training_TitleText.text = "Ready?";
+        Training_TitleText.text = "Get Ready";
+
         TimerImage.color = PrepColor;
         activeSets = (int)currentSets;
         activeRounds = (int)currentRounds;
+
+        Training_SetText.text = "Working " + (activeSets > 1 ? activeSets.ToString() + " Sets" : "Set");
+        Training_RoundText.text = "For " + (activeRounds > 1 ? activeRounds.ToString() + " Rounds" : "Round");
+        Training_IntervalText.text = "On: " + currentActivePeriod.ToString() + " / Off " + currentRestPeriod.ToString();
+
 
         while (trainingPrepTime > -1)
         {
@@ -206,12 +219,17 @@ public class UIManager : MonoBehaviour
         int restPeriod = (int)currentRestPeriod;
         int restRoundPeriod = (int)currentRestRoundPeriod;
         TimerImage.color = ActiveColor;
+
         Training_TitleText.text = "Work!";
+        Training_SetText.text = activeSets > 1 ? activeSets.ToString() + " Sets to Go" : "Last Set!";
+        Training_RoundText.text = activeRounds > 1 ? activeRounds.ToString() + " Rounds Left" : "Last Round!";
+        Training_IntervalText.text = currentActivePeriod.ToString() + " / " + currentRestPeriod.ToString();
+
         RoundBell.Play();
         while (activePeriod != 0)
         {
-            activePeriod--;
             Training_TimeText.text = activePeriod.ToString();
+            activePeriod--;
             yield return new WaitForSeconds(1);
         }
 
@@ -221,17 +239,18 @@ public class UIManager : MonoBehaviour
         {
             TimerImage.color = RestColor;
             Training_TitleText.text = "Rest!";
+            Training_SetText.text = "Breathe";
             while (restPeriod != 0)
             {
-                restPeriod--;
                 Training_TimeText.text = restPeriod.ToString();
+                restPeriod--;
                 yield return new WaitForSeconds(1);
             }
         }
 
         //we've finished a set
         activeSets--;
-        Training_SetText.text = activeSets > 1 ? activeSets.ToString() + " Sets to Go!" : "Last Set!";
+
 
         // check to see if we have more sets to do
         if (activeSets != 0)
@@ -248,15 +267,18 @@ public class UIManager : MonoBehaviour
                 Training_TitleText.text = "Long Rest!";
                 while (restRoundPeriod != 0)
                 {
-                    restRoundPeriod--;
                     Training_TimeText.text = restRoundPeriod.ToString();
+                    restRoundPeriod--;
+                    Training_SetText.text = "Catch";
+                    Training_RoundText.text = "Your";
+                    Training_IntervalText.text = "Breath";
                     yield return new WaitForSeconds(1);
                 }
                 RestRoundPanel.SetActive(false);
+
             }
             // we finally finished a full round
             activeRounds--;
-            Training_RoundText.text = activeRounds > 1 ? activeRounds.ToString() + " Rounds Left!" : "Last Round!";
             if (activeRounds != 0)
             {
                 // reset the set counter
@@ -270,9 +292,24 @@ public class UIManager : MonoBehaviour
 
     private void SetFinishedScreenText()
     {
-        Finished_SetText.text = currentSets > 1 ? currentSets.ToString() + " Sets" : currentSets.ToString() + " Set";
-        Finished_RoundText.text = currentRounds > 1 ? currentRounds.ToString() + " Rounds Completed" : currentRounds.ToString() + " Round Completed";
-        Finished_TimeLeftText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds) + " Total Time";
+        string sets = currentSets > 1 ? currentSets.ToString() + " Sets" : currentSets.ToString() + " Set";
+        string rounds = currentRounds > 1 ? currentRounds.ToString() + " Rounds" : currentRounds.ToString() + " Round";
+        Finished_SetText.text = sets + " / " + rounds;
+        // displays total time
+        Finished_RoundText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds) + " Total Time";
+
+        // now we need to subtract all of the rest times
+
+        int totalRestEachRound = ((int)currentRestPeriod * ((int)currentSets - 1));
+        int totalLongRestEachRound = ((int)currentRestRoundPeriod * ((int)currentRounds - 1));
+        int totalRestTime = totalRestEachRound + totalLongRestEachRound;
+        int finalTotalTimeSeconds = trainingTotalSeconds - totalRestTime;
+
+        // handle the processing
+        int finalActiveMinutes = Mathf.FloorToInt(finalTotalTimeSeconds / 60F);
+        int finalActiveSeconds = Mathf.FloorToInt(finalTotalTimeSeconds - finalActiveMinutes * 60);
+        // displays total active time
+        Finished_TimeLeftText.text = string.Format("{0:00}:{1:00}", finalActiveMinutes, finalActiveSeconds) + " Total Active Time";
 
     }
 
@@ -280,7 +317,7 @@ public class UIManager : MonoBehaviour
     {
         if (!hasNewProgramBeenSaved)
         {
-            print("Saving Program Data...");
+            //print("Saving Program Data...");
             //TODO: actually save to disc for retrieval later when we select repeat last
             SaveText.text = "Start?";
             hasNewProgramBeenSaved = true;
@@ -293,7 +330,7 @@ public class UIManager : MonoBehaviour
 
     public void Launch_Training_Program()
     {
-        print("Launching Training Program...");
+        //print("Launching Training Program...");
         GoTo_TrainingScreen();
         HandleTrainingTextUpdates();
         StartCoroutine(CountdownToStart());
