@@ -203,9 +203,9 @@ public class UIManager : MonoBehaviour
         trainingActiveSeconds = trainingTotalSeconds;
         while (trainingActiveSeconds != 0)
         {
-            trainingActiveSeconds--;
             ProcessWorkoutTime(trainingActiveSeconds);
             TrainingSlider.value = Mathf.InverseLerp(0, trainingTotalSeconds, trainingActiveSeconds);
+            trainingActiveSeconds--;
             yield return new WaitForSeconds(1);
         }
         FinishBell.Play();
