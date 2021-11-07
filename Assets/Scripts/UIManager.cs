@@ -14,7 +14,8 @@ public class UIManager : MonoBehaviour
     public GameObject TrainingScreen;
     public GameObject FinishedScreen;
 
-    //[Header("Minor Panels")]
+    [Header("Minor Panels")]
+    public GameObject RestRoundPanel;
 
 
     [Header("New Program Text Fields")]
@@ -23,6 +24,7 @@ public class UIManager : MonoBehaviour
     public Text RoundsText;
     public Text SetsText;
     public Text ActiveText;
+    public Text RestRoundText;
     public Text TotalText;
 
     [Header("Active Training ")]
@@ -48,12 +50,17 @@ public class UIManager : MonoBehaviour
     public Color PrepColor;
     public Color DefaultColor;
 
+    [Header("Audio Sources")]
+    public AudioSource RoundBell;
+    public AudioSource FinishBell;
+
 
     // training program data
     private float currentSets = 5;
     private float currentRounds = 5;
     private float currentActivePeriod = 30;
     private float currentRestPeriod = 20;
+    private float currentRestRoundPeriod = 60;
     private bool hasNewProgramBeenSaved = false;
 
     private int trainingTotalSeconds;
@@ -78,7 +85,7 @@ public class UIManager : MonoBehaviour
         GoTo_OpeningScreen();
         CalculateTotalTime();
         // handle misc hides
-
+        RestRoundPanel.SetActive(false);
     }
 
     // Update is called once per frame
@@ -160,6 +167,8 @@ public class UIManager : MonoBehaviour
     {
         Training_TitleText.text = "Ready?";
         TimerImage.color = PrepColor;
+        activeSets = (int)currentSets;
+        activeRounds = (int)currentRounds;
 
         while (trainingPrepTime > -1)
         {
@@ -169,6 +178,8 @@ public class UIManager : MonoBehaviour
             yield return new WaitForSeconds(1);
         }
 
+        // store current workout program data for the finished screen
+        SetFinishedScreenText();
         StartCoroutine(HandleWorkoutSlider());
         StartCoroutine(ActiveSet());
     }
@@ -177,9 +188,6 @@ public class UIManager : MonoBehaviour
     public IEnumerator HandleWorkoutSlider()
     {
         trainingActiveSeconds = trainingTotalSeconds;
-        // store current workout program data for the finished screen
-        SetFinishedScreenText();
-
         while (trainingActiveSeconds != 0)
         {
             trainingActiveSeconds--;
@@ -187,6 +195,7 @@ public class UIManager : MonoBehaviour
             TrainingSlider.value = Mathf.InverseLerp(0, trainingTotalSeconds, trainingActiveSeconds);
             yield return new WaitForSeconds(1);
         }
+        FinishBell.Play();
         GoTo_FinishedScreen();
         StopAllCoroutines();
     }
@@ -195,27 +204,34 @@ public class UIManager : MonoBehaviour
     {
         int activePeriod = (int)currentActivePeriod;
         int restPeriod = (int)currentRestPeriod;
+        int restRoundPeriod = (int)currentRestRoundPeriod;
         TimerImage.color = ActiveColor;
         Training_TitleText.text = "Work!";
+        RoundBell.Play();
         while (activePeriod != 0)
         {
             activePeriod--;
-
             Training_TimeText.text = activePeriod.ToString();
             yield return new WaitForSeconds(1);
         }
 
-        TimerImage.color = RestColor;
-        Training_TitleText.text = "Rest!";
-        while (restPeriod != 0)
+        RoundBell.Play();
+
+        if (activeSets > 1)
         {
-            restPeriod--;
-            Training_TimeText.text = restPeriod.ToString();
-            yield return new WaitForSeconds(1);
+            TimerImage.color = RestColor;
+            Training_TitleText.text = "Rest!";
+            while (restPeriod != 0)
+            {
+                restPeriod--;
+                Training_TimeText.text = restPeriod.ToString();
+                yield return new WaitForSeconds(1);
+            }
         }
+
         //we've finished a set
         activeSets--;
-        Training_SetText.text = activeSets.ToString() + " Sets to Go!";
+        Training_SetText.text = activeSets > 1 ? activeSets.ToString() + " Sets to Go!" : "Last Set!";
 
         // check to see if we have more sets to do
         if (activeSets != 0)
@@ -224,8 +240,23 @@ public class UIManager : MonoBehaviour
         }
         else//active sets equals zero which means we've finished a round
         {
+            // fire off the Rest Round as long as it s not the last round
+            if (activeRounds > 1)
+            {
+                RestRoundPanel.SetActive(true);
+                TimerImage.color = RestColor;
+                Training_TitleText.text = "Long Rest!";
+                while (restRoundPeriod != 0)
+                {
+                    restRoundPeriod--;
+                    Training_TimeText.text = restRoundPeriod.ToString();
+                    yield return new WaitForSeconds(1);
+                }
+                RestRoundPanel.SetActive(false);
+            }
+            // we finally finished a full round
             activeRounds--;
-            Training_RoundText.text = activeRounds.ToString() + " Rounds Left!";
+            Training_RoundText.text = activeRounds > 1 ? activeRounds.ToString() + " Rounds Left!" : "Last Round!";
             if (activeRounds != 0)
             {
                 // reset the set counter
@@ -239,8 +270,8 @@ public class UIManager : MonoBehaviour
 
     private void SetFinishedScreenText()
     {
-        Finished_SetText.text = currentSets.ToString() + " Sets";
-        Finished_RoundText.text = currentRounds.ToString() + " Rounds Completed";
+        Finished_SetText.text = currentSets > 1 ? currentSets.ToString() + " Sets" : currentSets.ToString() + " Set";
+        Finished_RoundText.text = currentRounds > 1 ? currentRounds.ToString() + " Rounds Completed" : currentRounds.ToString() + " Round Completed";
         Finished_TimeLeftText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds) + " Total Time";
 
     }
@@ -304,12 +335,29 @@ public class UIManager : MonoBehaviour
         CalculateTotalTime();
     }
 
+    public void Set_RestRound(float rest)
+    {
+        int restRoundRate = (int)rest * 10;
+        currentRestRoundPeriod = restRoundRate;
+        RestRoundText.text = restRoundRate + " secs Rest Round";
+        CalculateTotalTime();
+    }
+
 
     private void CalculateTotalTime()
     {
         float setTime = currentActivePeriod + currentRestPeriod;
-        trainingTotalSeconds = (int)((currentSets * currentRounds) * (setTime));
-
+        // add in the long rest for each round
+        setTime = setTime + (currentRestRoundPeriod * currentRounds);
+        // take off 1 rest period for each round as it is now a long rest...
+        setTime = setTime - (currentRestPeriod * currentRounds);
+        // figure out the raw total length based on sets and rounds
+        trainingTotalSeconds = (int)((currentSets * currentRounds) * setTime);
+        // now add in the long rest
+        trainingTotalSeconds = (int)(trainingTotalSeconds + (currentRestRoundPeriod * currentRounds) - (currentRestPeriod * currentRounds));
+        // finally take off the final long rest round at the end
+        trainingTotalSeconds = (int)(trainingTotalSeconds - currentRestRoundPeriod);
+        // handle the processing
         trainingMinutes = Mathf.FloorToInt(trainingTotalSeconds / 60F);
         trainingSeconds = Mathf.FloorToInt(trainingTotalSeconds - trainingMinutes * 60);
         TotalText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
