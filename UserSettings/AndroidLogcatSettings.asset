@@ -2,8 +2,8 @@
     "m_SelectedDeviceId": "R3CR609W8NK",
     "m_SelectedPackage": {
         "deviceId": "R3CR609W8NK",
-        "name": "com.DefaultCompany.com.unity.template.mobile2D",
-        "processId": 22778,
+        "name": "com.BauerVision.TabataTrainer",
+        "processId": 31859,
         "exited": false
     },
     "m_SelectedPriority": 0,
@@ -12,6 +12,12 @@
             "deviceId": "R3CR609W8NK",
             "name": "com.DefaultCompany.com.unity.template.mobile2D",
             "processId": 22778,
+            "exited": false
+        },
+        {
+            "deviceId": "R3CR609W8NK",
+            "name": "com.BauerVision.TabataTrainer",
+            "processId": 31859,
             "exited": false
         }
     ],

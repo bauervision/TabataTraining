@@ -44,11 +44,11 @@ public class UIManager : MonoBehaviour
 
 
     [Header("Colors")]
-    public Image TimerImage;
-    public Color RestColor;
-    public Color ActiveColor;
-    public Color PrepColor;
-    public Color DefaultColor;
+
+    public GameObject RestColor;
+    public GameObject ActiveColor;
+    public GameObject PrepColor;
+
 
     [Header("Audio Sources")]
     public AudioSource RoundBell;
@@ -61,7 +61,7 @@ public class UIManager : MonoBehaviour
     private float currentActivePeriod = 30;
     private float currentRestPeriod = 20;
     private float currentRestRoundPeriod = 60;
-    private bool hasNewProgramBeenSaved = false;
+    // private bool hasNewProgramBeenSaved = false;
 
     private int trainingTotalSeconds;
     private int trainingActiveSeconds;
@@ -174,12 +174,12 @@ public class UIManager : MonoBehaviour
     {
         Training_TitleText.text = "Get Ready";
 
-        TimerImage.color = PrepColor;
+        PrepColor.SetActive(true);
         activeSets = (int)currentSets;
         activeRounds = (int)currentRounds;
 
-        Training_SetText.text = "Working " + (activeSets > 1 ? activeSets.ToString() + " Sets" : "Set");
-        Training_RoundText.text = "For " + (activeRounds > 1 ? activeRounds.ToString() + " Rounds" : "Round");
+        Training_SetText.text = "Working " + (activeSets > 1 ? activeSets.ToString() + " Sets" : "1 Set");
+        Training_RoundText.text = "For " + (activeRounds > 1 ? activeRounds.ToString() + " Rounds" : "1 Round");
         Training_IntervalText.text = "On: " + currentActivePeriod.ToString() + " / Off " + currentRestPeriod.ToString();
 
 
@@ -197,6 +197,29 @@ public class UIManager : MonoBehaviour
         StartCoroutine(ActiveSet());
     }
 
+    private void HandlePrepColorChange()
+    {
+        RestColor.SetActive(false);
+        ActiveColor.SetActive(false);
+        PrepColor.SetActive(true);
+
+    }
+
+    private void HandleActiveColorChange()
+    {
+        RestColor.SetActive(false);
+        ActiveColor.SetActive(true);
+        PrepColor.SetActive(false);
+
+    }
+
+    private void HandleRestColorChange()
+    {
+        RestColor.SetActive(true);
+        ActiveColor.SetActive(false);
+        PrepColor.SetActive(false);
+
+    }
 
     public IEnumerator HandleWorkoutSlider()
     {
@@ -218,10 +241,10 @@ public class UIManager : MonoBehaviour
         int activePeriod = (int)currentActivePeriod;
         int restPeriod = (int)currentRestPeriod;
         int restRoundPeriod = (int)currentRestRoundPeriod;
-        TimerImage.color = ActiveColor;
+        HandleActiveColorChange();
 
         Training_TitleText.text = "Work!";
-        Training_SetText.text = activeSets > 1 ? activeSets.ToString() + " Sets to Go" : "Last Set!";
+        Training_SetText.text = activeSets > 1 ? HandleActiveSetText() : "Last Set!";
         Training_RoundText.text = activeRounds > 1 ? activeRounds.ToString() + " Rounds Left" : "Last Round!";
         Training_IntervalText.text = currentActivePeriod.ToString() + " / " + currentRestPeriod.ToString();
 
@@ -229,6 +252,7 @@ public class UIManager : MonoBehaviour
         while (activePeriod != 0)
         {
             Training_TimeText.text = activePeriod.ToString();
+            Training_TimeText.color = Color.white;
             activePeriod--;
             yield return new WaitForSeconds(1);
         }
@@ -237,12 +261,13 @@ public class UIManager : MonoBehaviour
 
         if (activeSets > 1)
         {
-            TimerImage.color = RestColor;
+            HandleRestColorChange();
             Training_TitleText.text = "Rest!";
-            Training_SetText.text = "Breathe";
+            Training_SetText.text = activeSets > 2 ? (activeSets - 1).ToString() + " Sets Left" : "Almost Done!";
             while (restPeriod != 0)
             {
                 Training_TimeText.text = restPeriod.ToString();
+                Training_TimeText.color = Color.gray;
                 restPeriod--;
                 yield return new WaitForSeconds(1);
             }
@@ -262,12 +287,14 @@ public class UIManager : MonoBehaviour
             // fire off the Rest Round as long as it s not the last round
             if (activeRounds > 1)
             {
+                FinishBell.Play();
                 RestRoundPanel.SetActive(true);
-                TimerImage.color = RestColor;
+                HandleRestColorChange();
                 Training_TitleText.text = "Long Rest!";
                 while (restRoundPeriod != 0)
                 {
                     Training_TimeText.text = restRoundPeriod.ToString();
+                    Training_TimeText.color = Color.grey;
                     restRoundPeriod--;
                     Training_SetText.text = "Catch";
                     Training_RoundText.text = "Your";
@@ -289,6 +316,21 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    private string HandleActiveSetText()
+    {
+        switch (activeSets)
+        {
+            case 3: return "3rd Set";
+            case 4: return "4th Set";
+            case 5: return "5th Set";
+            case 6: return "6th Set";
+            case 7: return "7th Set";
+            case 8: return "8th Set";
+            case 9: return "9th Set";
+            case 10: return "10th Set";
+            default: return "2nd Set";
+        }
+    }
 
     private void SetFinishedScreenText()
     {
@@ -313,24 +355,11 @@ public class UIManager : MonoBehaviour
 
     }
 
-    public void Save_Training_Program()
-    {
-        if (!hasNewProgramBeenSaved)
-        {
-            //print("Saving Program Data...");
-            //TODO: actually save to disc for retrieval later when we select repeat last
-            SaveText.text = "Start?";
-            hasNewProgramBeenSaved = true;
-        }
-        else
-            Launch_Training_Program();
 
-
-    }
 
     public void Launch_Training_Program()
     {
-        //print("Launching Training Program...");
+        //TODO: actually save to disc for retrieval later when we select repeat last
         GoTo_TrainingScreen();
         HandleTrainingTextUpdates();
         StartCoroutine(CountdownToStart());
