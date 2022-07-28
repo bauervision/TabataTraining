@@ -3,14 +3,15 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class UIManager : MonoBehaviour
 {
+    public static UIManager instance;
+
     [Header("Main Screens")]
     public GameObject OpeningScreen;
     public GameObject NewScreen;
-    public GameObject RepeatScreen;
-    public GameObject SurpriseScreen;
     public GameObject TrainingScreen;
     public GameObject FinishedScreen;
 
@@ -22,10 +23,12 @@ public class UIManager : MonoBehaviour
     public Text SaveText;
     public Text TrainingText;
     public Text RoundsText;
+    public Text WarmupText;
+    public Text MetronomeText;
     public Text SetsText;
     public Text ActiveText;
     public Text RestRoundText;
-    public Text TotalText;
+    //public Text TotalText;
 
     [Header("Active Training ")]
     public Slider TrainingSlider;
@@ -33,7 +36,7 @@ public class UIManager : MonoBehaviour
     public Text Training_RoundText;
     public Text Training_IntervalText;
     public Text Training_TimeLeftText;
-    public Text Training_TimeText;
+    public TextMeshProUGUI Training_TimeText;
     public Text Training_TitleText;
 
 
@@ -53,9 +56,27 @@ public class UIManager : MonoBehaviour
     [Header("Audio Sources")]
     public AudioSource RoundBell;
     public AudioSource FinishBell;
+    public AudioSource WarmupComplete;
+    public AudioSource TenSeconds;
+    public AudioSource LastRound;
+    public AudioSource LastSet;
+    public AudioSource BeginWarmup;
 
+    [Header("Sliders")]
+    public Slider WarmUpSlider;
+    public Slider SetSlider;
+    public Slider RoundSlider;
+    public Slider OnSlider;
+    public Slider OffSlider;
+    public Slider RestSlider;
+    public Slider MetronomeSlider;
+
+    [Header("Metronome")]
+    public Metronome metronome;
 
     // training program data
+    private float currentMetronome = 5;
+    private float currentWarmup = 5;//mins
     private float currentSets = 5;
     private float currentRounds = 5;
     private float currentActivePeriod = 30;
@@ -73,32 +94,38 @@ public class UIManager : MonoBehaviour
     int activeRounds;
     int activeSets;
 
-    private void Awake()
-    {
-        //TODO: retrieve last saved work out
-
-    }
 
     // Start is called before the first frame update
     void Start()
     {
+        instance = this;
+
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
         GoTo_OpeningScreen();
         CalculateTotalTime();
 
-        // for now hide these
-        RepeatScreen.SetActive(false);
-        SurpriseScreen.SetActive(false);
-
         // handle misc hides
         RestRoundPanel.SetActive(false);
     }
 
-    // Update is called once per frame
-    void Update()
+    public void SetWorkOutDataFromPrevious(WorkoutData previous)
     {
-
+        currentMetronome = previous.currentMetronome;
+        currentWarmup = previous.currentWarmup;//mins
+        currentSets = previous.currentSets;
+        currentRounds = previous.currentRounds;
+        currentActivePeriod = previous.currentActivePeriod;
+        currentRestPeriod = previous.currentRestPeriod;
+        currentRestRoundPeriod = previous.currentRestRoundPeriod;
+        // now update all the sliders accordingly
+        MetronomeSlider.value = (currentMetronome * 0.1f) - 9;
+        WarmUpSlider.value = currentWarmup;
+        SetSlider.value = currentSets;
+        RoundSlider.value = currentRounds;
+        OnSlider.value = currentActivePeriod / 10;
+        OffSlider.value = currentRestPeriod / 10;
+        RestSlider.value = currentRestRoundPeriod / 10;
     }
 
     #region UI Methods
@@ -107,8 +134,6 @@ public class UIManager : MonoBehaviour
     {
         OpeningScreen.SetActive(false);
         NewScreen.SetActive(false);
-        RepeatScreen.SetActive(false);
-        SurpriseScreen.SetActive(false);
         TrainingScreen.SetActive(false);
         FinishedScreen.SetActive(false);
     }
@@ -127,19 +152,7 @@ public class UIManager : MonoBehaviour
 
     }
 
-    public void GoTo_RepeatScreen()
-    {
-        HideAllScreens();
-        RepeatScreen.SetActive(true);
 
-    }
-
-    public void GoTo_SurpriseScreen()
-    {
-        HideAllScreens();
-        SurpriseScreen.SetActive(true);
-
-    }
 
     public void GoTo_TrainingScreen()
     {
@@ -159,18 +172,14 @@ public class UIManager : MonoBehaviour
         HideAllScreens();
         OpeningScreen.SetActive(true);
         StopAllCoroutines();
+        metronome.enabled = false;
     }
 
-    public void Start_Training()
-    {
 
-        // and launch the timer
-    }
     #endregion
 
     #region Main Methods
-
-    IEnumerator CountdownToStart()
+    IEnumerator CountdownToStart(bool hadWarmup)
     {
         Training_TitleText.text = "Get Ready";
 
@@ -181,20 +190,74 @@ public class UIManager : MonoBehaviour
         Training_SetText.text = "Working " + (activeSets > 1 ? activeSets.ToString() + " Sets" : "1 Set");
         Training_RoundText.text = "For " + (activeRounds > 1 ? activeRounds.ToString() + " Rounds" : "1 Round");
         Training_IntervalText.text = "On: " + currentActivePeriod.ToString() + " / Off " + currentRestPeriod.ToString();
+        // reset the font size
+        Training_TimeText.fontSize = 640;
 
+        // if we didnt run a warmup
+        if (!hadWarmup)
+            TenSeconds.Play();
 
         while (trainingPrepTime > -1)
         {
+
             Training_TimeText.text = trainingPrepTime.ToString();
+            Training_TimeText.color = Color.gray;
             trainingPrepTime--;
 
             yield return new WaitForSeconds(1);
         }
 
-        // store current workout program data for the finished screen
         SetFinishedScreenText();
         StartCoroutine(HandleWorkoutSlider());
         StartCoroutine(ActiveSet());
+        trainingPrepTime = 10;
+    }
+
+    private void SaveCurrentWorkout()
+    {
+        // save the workout data
+        WorkoutData newData = new WorkoutData();
+        newData.currentActivePeriod = currentActivePeriod;
+        newData.currentMetronome = currentMetronome;
+        newData.currentRestPeriod = currentRestPeriod;
+        newData.currentRestRoundPeriod = currentRestRoundPeriod;
+        newData.currentRounds = currentRounds;
+        newData.currentSets = currentSets;
+        newData.currentWarmup = currentWarmup;
+        DataManager.instance.SetCurrentWorkout(newData);
+    }
+
+    IEnumerator RunWarmup()
+    {
+        Training_TitleText.text = "Warm Up";
+        PrepColor.SetActive(true);
+
+        Training_SetText.text = "";
+        Training_RoundText.text = "";
+        Training_IntervalText.text = "";
+        Training_TimeLeftText.text = "";
+        // update warm up to minutes
+        int totalWarmupTime = (int)currentWarmup * 60;
+        currentWarmup = totalWarmupTime;
+        // update the size for the warmup counter
+        Training_TimeText.fontSize = 300;
+        BeginWarmup.Play();
+
+        while (currentWarmup > -1)
+        {
+            TrainingSlider.value = Mathf.InverseLerp(0, totalWarmupTime, currentWarmup);
+            Training_TimeText.text = ProcessWarmupTime((int)currentWarmup);
+            Training_TimeText.color = Color.gray;
+            currentWarmup--;
+
+            yield return new WaitForSeconds(1);
+        }
+
+        WarmupComplete.Play();
+
+        // warm up complete fire off work out
+        StartCoroutine(CountdownToStart(true));
+
     }
 
     private void HandlePrepColorChange()
@@ -218,7 +281,6 @@ public class UIManager : MonoBehaviour
         RestColor.SetActive(true);
         ActiveColor.SetActive(false);
         PrepColor.SetActive(false);
-
     }
 
     public IEnumerator HandleWorkoutSlider()
@@ -249,13 +311,31 @@ public class UIManager : MonoBehaviour
         Training_IntervalText.text = currentActivePeriod.ToString() + " / " + currentRestPeriod.ToString();
 
         RoundBell.Play();
+
+        if (currentMetronome != 0)
+        {
+            if (Metronome.instance.bpm != currentMetronome)
+                Metronome.instance.bpm = currentMetronome;
+            metronome.enabled = true;
+        }
+
+
         while (activePeriod != 0)
         {
             Training_TimeText.text = activePeriod.ToString();
             Training_TimeText.color = Color.white;
             activePeriod--;
+
+            // fire off a sound at 10 seconds
+            if (activePeriod == 10)
+            {
+                TenSeconds.Play();
+            }
+
             yield return new WaitForSeconds(1);
         }
+
+        metronome.enabled = false;
 
         RoundBell.Play();
 
@@ -266,9 +346,17 @@ public class UIManager : MonoBehaviour
             Training_SetText.text = activeSets > 2 ? (activeSets - 1).ToString() + " Sets Left" : "Almost Done!";
             while (restPeriod != 0)
             {
+
+                if (restPeriod == 10 && (activeSets - 1) < 2)
+                    LastSet.Play();
+
                 Training_TimeText.text = restPeriod.ToString();
                 Training_TimeText.color = Color.gray;
                 restPeriod--;
+
+
+
+
                 yield return new WaitForSeconds(1);
             }
         }
@@ -279,9 +367,7 @@ public class UIManager : MonoBehaviour
 
         // check to see if we have more sets to do
         if (activeSets != 0)
-        {
             StartCoroutine(ActiveSet());
-        }
         else//active sets equals zero which means we've finished a round
         {
             // fire off the Rest Round as long as it s not the last round
@@ -299,6 +385,13 @@ public class UIManager : MonoBehaviour
                     Training_SetText.text = "Catch";
                     Training_RoundText.text = "Your";
                     Training_IntervalText.text = "Breath";
+
+                    // play a final sound depending
+                    if (restRoundPeriod == 10)
+                    {
+                        if ((activeRounds - 1) == 1)
+                            LastRound.Play();
+                    }
                     yield return new WaitForSeconds(1);
                 }
                 RestRoundPanel.SetActive(false);
@@ -359,10 +452,15 @@ public class UIManager : MonoBehaviour
 
     public void Launch_Training_Program()
     {
-        //TODO: actually save to disc for retrieval later when we select repeat last
         GoTo_TrainingScreen();
         HandleTrainingTextUpdates();
-        StartCoroutine(CountdownToStart());
+        HandlePrepColorChange();
+        SaveCurrentWorkout();
+        // if we dont want a warm up, then launch the program
+        if (currentWarmup == 0)
+            StartCoroutine(CountdownToStart(false));
+        else
+            StartCoroutine(RunWarmup());
 
     }
 
@@ -370,6 +468,44 @@ public class UIManager : MonoBehaviour
 
 
     #region Sliders
+
+    public void Set_Metronome(float rawValue)
+    {
+        // if anything other than zero, we want to use metronome
+        if (rawValue != 0)
+        {
+            int startingBPS = 90;
+            int interval = 10;
+            currentMetronome = startingBPS + (interval * rawValue);
+            MetronomeText.text = "Metronome: " + currentMetronome + " bps";
+            MetronomeText.color = new Color(1, 0.8f, 0.4f, 1);
+        }
+        else
+        {
+            currentMetronome = 0;
+            MetronomeText.text = "Metronome: Disabled";
+            MetronomeText.color = Color.gray;
+        }
+
+
+    }
+
+    public void Set_WarmUp(float mins)
+    {
+        if (mins != 0)
+        {
+            currentWarmup = mins;
+            WarmupText.text = mins + " Min Warm Up";
+            WarmupText.color = new Color(1, 0.8f, 0.4f, 1);
+        }
+        else
+        {
+            currentWarmup = 0;
+            WarmupText.text = "Warm Up Disabled";
+            WarmupText.color = Color.gray;
+        }
+
+    }
 
     public void Set_Sets(float sets)
     {
@@ -425,7 +561,7 @@ public class UIManager : MonoBehaviour
         // handle the processing
         trainingMinutes = Mathf.FloorToInt(trainingTotalSeconds / 60F);
         trainingSeconds = Mathf.FloorToInt(trainingTotalSeconds - trainingMinutes * 60);
-        TotalText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
+        //TotalText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
     }
 
     private void ProcessWorkoutTime(int seconds)
@@ -433,6 +569,13 @@ public class UIManager : MonoBehaviour
         trainingMinutes = Mathf.FloorToInt(seconds / 60F);
         trainingSeconds = Mathf.FloorToInt(seconds - trainingMinutes * 60);
         Training_TimeLeftText.text = string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
+    }
+
+    private string ProcessWarmupTime(int seconds)
+    {
+        trainingMinutes = Mathf.FloorToInt(seconds / 60F);
+        trainingSeconds = Mathf.FloorToInt(seconds - trainingMinutes * 60);
+        return string.Format("{0:00}:{1:00}", trainingMinutes, trainingSeconds);
     }
 
     private void HandleTrainingTextUpdates()
